@@ -48,15 +48,15 @@ def str_to_float(df, seller_type):
     """
     # 筛选出售卖者订单
     df = df.loc[df.iloc[:, 0] == seller_type]
-    # 将字符串处理为浮点型
+    # 将字符串处理为浮点型,德国站点会出现1.289,00这种特殊数据
     if pd.api.types.is_string_dtype(df.iloc[:, 2]) == True:
-        df.iloc[:, 2] = df.iloc[:, 2].str[::-1].str.replace(',', '.', 1).str[::-1].str.replace(',', '').astype(np.float)
+        df.iloc[:, 2] = df.iloc[:, 2].str.replace('.', ',').str[::-1].str.replace(',', '.', 1).str[::-1].str.replace(',', '').astype(np.float)
     if pd.api.types.is_string_dtype(df.iloc[:, 3]) == True:
-        df.iloc[:, 3] = df.iloc[:, 3].str[::-1].str.replace(',', '.', 1).str[::-1].str.replace(',', '').astype(np.float)
+        df.iloc[:, 3] = df.iloc[:, 3].str.replace('.', ',').str[::-1].str.replace(',', '.', 1).str[::-1].str.replace(',', '').astype(np.float)
     # 计算总销售额
     origin_sales = df.iloc[:, 2:].sum().sum()
     # 计算FBA运费
-    fba_cost = df.loc[df.iloc[:, 1]=='Amazon'].iloc[:, 3].sum()
+    fba_cost = df.loc[df.iloc[:, 1] == 'Amazon'].iloc[:, 3].sum()
     return origin_sales, fba_cost
 
 
@@ -107,37 +107,39 @@ def calculated_sales(sites):
     return df_site_sales_fba
 
 
-def currency_exchange(site_sales) :
-    """
-    计算各个站点的实际销售额原币，并将其转换为美元
-    汇率（转美元）对应表：
-            日元          0.0094309
-            欧元          1.1097927
-            墨西哥比索     0.04991
-            英镑          1.2244953
-            加币          0.75643
-    汇率（美转人民币）：     6.8747
+def currency_exchange(site_sales):
+    '''
+    计算各个站点的实际销售额原币，并将其转换为美元，汇率通过加载当前目录下的汇率表来提取
 
     return： 新增“实际销售原币”和“实际销售USD”列的site_sales
-    """
-    # 货币转美元映射
-    conversion_rate = {'美元': 1, '日元': 0.0094309, '欧元': 1.1097927,
-                       '加币': 0.75643, '比索': 0.04991, '英镑': 1.2244953, '人民币': 6.8747}
+    '''
+    # 加载汇率表
+    parities = pd.read_excel('.\\汇率表.xlsx', header=None)
+    parities.set_index(0, inplace=True)
     # 计算实际销售额原币
     site_sales['实际销售额原币'] = site_sales['销售额原币'] - site_sales['FBA配送费']
     # 各个站点的实际销售额转换为美元
     site_sales.reset_index(inplace=True)
-    site_sales.loc[site_sales['站点'].str.contains('美国'), '实际销售额USD'] = site_sales['实际销售额原币'] * conversion_rate['美元']
-    site_sales.loc[site_sales['站点'].str.contains('加拿大'), '实际销售额USD'] = site_sales['实际销售额原币'] * conversion_rate['加币']
-    site_sales.loc[site_sales['站点'].str.contains('墨西哥'), '实际销售额USD'] = site_sales['实际销售额原币'] * conversion_rate['比索']
-    site_sales.loc[site_sales['站点'].str.contains('英国'), '实际销售额USD'] = site_sales['实际销售额原币'] * conversion_rate['英镑']
-    site_sales.loc[site_sales['站点'].str.contains('日本'), '实际销售额USD'] = site_sales['实际销售额原币'] * conversion_rate['日元']
-    site_sales.loc[site_sales['站点'].str.contains('德国'), '实际销售额USD'] = site_sales['实际销售额原币'] * conversion_rate['欧元']
-    site_sales.loc[site_sales['站点'].str.contains('法国'), '实际销售额USD'] = site_sales['实际销售额原币'] * conversion_rate['欧元']
-    site_sales.loc[site_sales['站点'].str.contains('意大利'), '实际销售额USD'] = site_sales['实际销售额原币'] * conversion_rate['欧元']
-    site_sales.loc[site_sales['站点'].str.contains('西班牙'), '实际销售额USD'] = site_sales['实际销售额原币'] * conversion_rate['欧元']
+    site_sales.loc[site_sales['站点'].str.contains('美国'), '实际销售额USD'] = site_sales['实际销售额原币'] * parities.loc['美元'].values[
+        0]
+    site_sales.loc[site_sales['站点'].str.contains('加拿大'), '实际销售额USD'] = site_sales['实际销售额原币'] * \
+                                                                       parities.loc['加币'].values[0]
+    site_sales.loc[site_sales['站点'].str.contains('墨西哥'), '实际销售额USD'] = site_sales['实际销售额原币'] * \
+                                                                       parities.loc['比索'].values[0]
+    site_sales.loc[site_sales['站点'].str.contains('英国'), '实际销售额USD'] = site_sales['实际销售额原币'] * parities.loc['英镑'].values[
+        0]
+    site_sales.loc[site_sales['站点'].str.contains('日本'), '实际销售额USD'] = site_sales['实际销售额原币'] * parities.loc['日元'].values[
+        0]
+    site_sales.loc[site_sales['站点'].str.contains('德国'), '实际销售额USD'] = site_sales['实际销售额原币'] * parities.loc['欧元'].values[
+        0]
+    site_sales.loc[site_sales['站点'].str.contains('法国'), '实际销售额USD'] = site_sales['实际销售额原币'] * parities.loc['欧元'].values[
+        0]
+    site_sales.loc[site_sales['站点'].str.contains('意大利'), '实际销售额USD'] = site_sales['实际销售额原币'] * \
+                                                                       parities.loc['欧元'].values[0]
+    site_sales.loc[site_sales['站点'].str.contains('西班牙'), '实际销售额USD'] = site_sales['实际销售额原币'] * \
+                                                                       parities.loc['欧元'].values[0]
     # 各站点的实际销售额转换为人民币
-    site_sales['实际销售额RMB'] = site_sales['实际销售额USD'] * conversion_rate['人民币']
+    site_sales['实际销售额RMB'] = site_sales['实际销售额USD'] * parities.loc['美转人民币'].values[0]
     return site_sales
 
 
